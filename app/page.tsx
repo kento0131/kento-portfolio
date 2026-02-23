@@ -40,12 +40,14 @@ async function loadPhotos(): Promise<PhotoData[]> {
     let exif: PhotoData["exif"] = {};
     try {
       const data = readExifFromJpeg(filePath);
-      const fnumber = data?.Photo?.FNumber ?? data?.Exif?.FNumber;
-      const iso = data?.Photo?.ISOSpeedRatings ?? data?.Exif?.ISOSpeedRatings;
-      const expTime = data?.Photo?.ExposureTime ?? data?.Exif?.ExposureTime;
-      const make = (data?.Image?.Make as string | undefined)?.replace("SONY", "Sony");
-      const model = data?.Image?.Model as string | undefined;
-      const lens = data?.Photo?.LensModel as string | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = data as any;
+      const fnumber = d?.Photo?.FNumber;
+      const iso = d?.Photo?.ISOSpeedRatings;
+      const expTime = d?.Photo?.ExposureTime;
+      const make = (d?.Image?.Make as string | undefined)?.replace("SONY", "Sony");
+      const model = d?.Image?.Model as string | undefined;
+      const lens = d?.Photo?.LensModel as string | undefined;
       exif = {
         camera: make && model ? `${make} ${model}` : model,
         lens: lens ?? undefined,
