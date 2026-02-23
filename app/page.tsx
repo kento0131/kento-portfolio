@@ -1,65 +1,85 @@
-import Image from "next/image";
+import fs from "fs";
+import path from "path";
+import exifReader from "exif-reader";
+import Lightbox, { PhotoData } from "./Lightbox";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+
+
+function formatShutter(exp: number): string {
+  if (exp >= 1) return `${exp}s`;
+  return `1/${Math.round(1 / exp)}s`;
+}
+
+function readExifFromJpeg(filePath: string) {
+  const buf = fs.readFileSync(filePath);
+  let offset = 2;
+  while (offset < buf.length - 4) {
+    const marker = buf.readUInt16BE(offset);
+    const segLen = buf.readUInt16BE(offset + 2);
+    if (marker === 0xffe1) {
+      const exifBuf = buf.slice(offset + 4, offset + 2 + segLen);
+      return exifReader(exifBuf);
+    }
+    offset += 2 + segLen;
+  }
+  return null;
+}
+
+async function loadPhotos(): Promise<PhotoData[]> {
+  const photosDir = path.join(process.cwd(), "public", "photos");
+  const files = fs
+    .readdirSync(photosDir)
+    .filter((f) => /\.(jpe?g)$/i.test(f))
+    .sort();
+
+  const photos: PhotoData[] = [];
+  for (const file of files) {
+    const filePath = path.join(photosDir, file);
+    let exif: PhotoData["exif"] = {};
+    try {
+      const data = readExifFromJpeg(filePath);
+      const fnumber = data?.Photo?.FNumber ?? data?.Exif?.FNumber;
+      const iso = data?.Photo?.ISOSpeedRatings ?? data?.Exif?.ISOSpeedRatings;
+      const expTime = data?.Photo?.ExposureTime ?? data?.Exif?.ExposureTime;
+      const make = (data?.Image?.Make as string | undefined)?.replace("SONY", "Sony");
+      const model = data?.Image?.Model as string | undefined;
+      const lens = data?.Photo?.LensModel as string | undefined;
+      exif = {
+        camera: make && model ? `${make} ${model}` : model,
+        lens: lens ?? undefined,
+        aperture: fnumber ? `f/${fnumber}` : undefined,
+        iso: iso ? String(iso) : undefined,
+        shutter: expTime ? formatShutter(expTime) : undefined,
+      };
+    } catch (err) {
+      console.error(`[EXIF] Failed for ${file}:`, err);
+    }
+    photos.push({ src: `/photos/${file}`, alt: path.parse(file).name, exif });
+  }
+  return photos;
+}
+
+export default async function Home() {
+  const photos = await loadPhotos();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen bg-[#0e0e0e] text-white">
+      <header className="py-16 text-center">
+        <h1 className="text-4xl font-thin tracking-[0.3em] uppercase text-white/90">
+          Portfolio
+        </h1>
+        <p className="mt-3 text-sm tracking-widest text-white/40 uppercase">
+          Photography by Kento
+        </p>
+      </header>
+
+      <Lightbox photos={photos} />
+
+      <footer className="text-center pb-10 text-white/20 text-xs tracking-widest uppercase">
+        © 2025 Kento
+      </footer>
+    </main>
   );
 }
