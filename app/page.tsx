@@ -1,70 +1,21 @@
-import fs from "fs";
-import path from "path";
-import exifReader from "exif-reader";
-import Lightbox, { PhotoData } from "./Lightbox";
+import Image from "next/image";
+import Link from "next/link";
+import { CATEGORIES } from "@/lib/categories";
+import { loadPhotosFromDir } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
-
-
-function formatShutter(exp: number): string {
-  if (exp >= 1) return `${exp}s`;
-  return `1/${Math.round(1 / exp)}s`;
-}
-
-function readExifFromJpeg(filePath: string) {
-  const buf = fs.readFileSync(filePath);
-  let offset = 2;
-  while (offset < buf.length - 4) {
-    const marker = buf.readUInt16BE(offset);
-    const segLen = buf.readUInt16BE(offset + 2);
-    if (marker === 0xffe1) {
-      const exifBuf = buf.slice(offset + 4, offset + 2 + segLen);
-      return exifReader(exifBuf);
-    }
-    offset += 2 + segLen;
-  }
-  return null;
-}
-
-async function loadPhotos(): Promise<PhotoData[]> {
-  const photosDir = path.join(process.cwd(), "public", "photos");
-  const files = fs
-    .readdirSync(photosDir)
-    .filter((f) => /\.(jpe?g)$/i.test(f))
-    .sort();
-
-  const photos: PhotoData[] = [];
-  for (const file of files) {
-    const filePath = path.join(photosDir, file);
-    let exif: PhotoData["exif"] = {};
-    try {
-      const data = readExifFromJpeg(filePath);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const d = data as any;
-      const fnumber = d?.Photo?.FNumber;
-      const iso = d?.Photo?.ISOSpeedRatings;
-      const expTime = d?.Photo?.ExposureTime;
-      const make = (d?.Image?.Make as string | undefined)?.replace("SONY", "Sony");
-      const model = d?.Image?.Model as string | undefined;
-      const lens = d?.Photo?.LensModel as string | undefined;
-      exif = {
-        camera: make && model ? `${make} ${model}` : model,
-        lens: lens ?? undefined,
-        aperture: fnumber ? `f/${fnumber}` : undefined,
-        iso: iso ? String(iso) : undefined,
-        shutter: expTime ? formatShutter(expTime) : undefined,
-      };
-    } catch (err) {
-      console.error(`[EXIF] Failed for ${file}:`, err);
-    }
-    photos.push({ src: `/photos/${file}`, alt: path.parse(file).name, exif });
-  }
-  return photos;
-}
-
 export default async function Home() {
-  const photos = await loadPhotos();
+  const categoriesWithThumb = await Promise.all(
+    CATEGORIES.map(async (cat) => {
+      const photos = await loadPhotosFromDir(cat.dir);
+      const thumb =
+        photos.length > 0
+          ? photos[Math.floor(Math.random() * photos.length)]
+          : null;
+      return { ...cat, thumb, count: photos.length };
+    })
+  );
 
   return (
     <main className="min-h-screen bg-[#0e0e0e] text-white">
@@ -77,7 +28,39 @@ export default async function Home() {
         </p>
       </header>
 
-      <Lightbox photos={photos} />
+      <section className="max-w-4xl mx-auto px-6 pb-20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {categoriesWithThumb.map((cat) => (
+            <Link key={cat.slug} href={`/c/${cat.slug}`} className="group block">
+              <div className="relative overflow-hidden rounded-sm bg-[#1a1a1a] aspect-[3/2]">
+                {cat.thumb ? (
+                  <Image
+                    src={cat.thumb.src}
+                    alt={cat.label}
+                    fill
+                    quality={75}
+                    className="object-cover transition-transform duration-700 ease-in-out group-hover:scale-[1.04]"
+                    sizes="(max-width: 640px) 100vw, 50vw"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-white/20 text-xs tracking-widest uppercase">
+                    No photos yet
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-500" />
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <p className="text-white text-lg font-thin tracking-[0.2em] uppercase">
+                    {cat.label}
+                  </p>
+                  <p className="text-white/40 text-xs tracking-widest mt-1">
+                    {cat.count} {cat.count === 1 ? "photo" : "photos"}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <footer className="text-center pb-10 text-white/20 text-xs tracking-widest uppercase">
         © 2025 Kento

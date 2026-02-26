@@ -2,18 +2,9 @@
 
 import Image from "next/image";
 import { useState, useRef, useCallback, useEffect } from "react";
+import type { PhotoData } from "@/lib/photos";
 
-export type PhotoData = {
-    src: string;
-    alt: string;
-    exif: {
-        camera?: string;
-        lens?: string;
-        aperture?: string;
-        iso?: string;
-        shutter?: string;
-    };
-};
+export type { PhotoData };
 
 export default function Lightbox({ photos }: { photos: PhotoData[] }) {
     const [selected, setSelected] = useState<PhotoData | null>(null);
