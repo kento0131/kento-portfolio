@@ -100,12 +100,12 @@ export default function Lightbox({ photos }: { photos: PhotoData[] }) {
     return (
         <>
             {/* Photo Grid */}
-            <section className="max-w-6xl mx-auto px-6 pb-20">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <section className="max-w-6xl mx-auto px-6 pb-28">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     {photos.map((photo) => (
                         <div
                             key={photo.src}
-                            className="group relative overflow-hidden rounded-sm bg-[#1a1a1a] cursor-zoom-in"
+                            className="group relative overflow-hidden rounded-sm bg-[#ebebeb] cursor-zoom-in"
                             onClick={() => openLightbox(photo)}
                         >
                             <Image

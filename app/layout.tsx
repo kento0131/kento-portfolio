@@ -33,7 +33,7 @@ export default function RootLayout({
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Instagram"
-          className="fixed bottom-6 right-6 z-50 text-white/30 hover:text-white/80 transition-colors duration-300"
+          className="fixed bottom-6 right-6 z-50 text-[#ccc] hover:text-[#555] transition-colors duration-300"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
